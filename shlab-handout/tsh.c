@@ -180,24 +180,51 @@ void eval(char *cmdline)
 	
 	//argv has been filled
 
-	if(builtin_cmd(argv) != 0)
-		printf("We have a builtin command! Already executed.\n");
+	if (!(builtin_cmd(argv)))
+	{
 
-	//Fork a child process and run the job in the context of the child
+		//Fork a child process and run the job in the context of the child
 	
-	pid_t pid;
-	int child_status;
+		pid_t pid;
+		int child_status;
 
-	if ((pid = fork()) == 0)
-	{
-		//Child process
-		execve(argv[0],argv,environ);
-	}
-	else
-	{
-		wait(&child_status);
-	}
+		if ((pid = fork()) == 0)	//fork returns 0 to child and child's pid to parent
+		{
+			//Child process
+			
+			//Run job
+			execve(argv[0],argv,environ);
+		}
+		else
+		{
+			//Parent process	
+	
+			if (parseRet == 0)
+			{
+				//Run child process in foreground
+			
+				//Add child to job list
+				addjob(jobs, pid, FG, cmdline);
+				//Parent waits for child to terminate
+				wait(&child_status);
+				//Delete child from job list
+				deletejob(jobs, pid);
+			}
 
+			else if (parseRet == 1)
+			{
+				//Run child process in background
+			
+				//Add child to job list
+				addjob(jobs, pid, BG, cmdline);
+				//Print info line
+				printf("[%d] (%d) %s", pid2jid(pid), pid, cmdline); 
+	
+
+			}
+		}
+
+	}
 	
 
 	return;
@@ -275,7 +302,7 @@ int builtin_cmd(char **argv)
 	else if (strcmp(argv[0], "bg")==0)
                  printf("bgbgbg\n");
 	else if (strcmp(argv[0], "jobs")==0)
-                 printf("STEVE JOBS\n");
+                 listjobs(jobs);
 	else
 		return 0;     /* not a builtin command */
 
@@ -287,6 +314,7 @@ int builtin_cmd(char **argv)
  */
 void do_bgfg(char **argv) 
 {
+	//Þetta er bara til að taka núþegar keyrandi processa og setja í bg eða fg
     return;
 }
 
@@ -311,7 +339,8 @@ void waitfg(pid_t pid)
  */
 void sigchld_handler(int sig) 
 {
-    return;
+    	//Gerist þegar background process klárast
+	return;
 }
 
 /* 
@@ -396,6 +425,7 @@ int addjob(struct job_t *jobs, pid_t pid, int state, char *cmdline)
     printf("Tried to create too many jobs\n");
     return 0;
 }
+
 
 /* deletejob - Delete a job whose PID=pid from the job list */
 int deletejob(struct job_t *jobs, pid_t pid) 
