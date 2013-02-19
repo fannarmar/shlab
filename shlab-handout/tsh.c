@@ -4,7 +4,7 @@
  * You __MUST__ add your user information here below
  * 
  * === User information ===
- * Group: NONE
+ * Group: hopurhopur
  * User 1: fannarf12
  * SSN: 2709892339
  * User 2: thorsteinnts09
@@ -173,7 +173,12 @@ int main(int argc, char **argv)
 */
 void eval(char *cmdline) 
 {
-    return;
+	char **argv;	//Define argv array
+	int bParseRet;	//0 run in fg, 1 run in bg or no arguments given (blank line)
+	bParseRet = parseline(*cmdline, **argv);	//Fill out argv
+
+
+	return;
 }
 
 /* 
