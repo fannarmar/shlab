@@ -304,7 +304,8 @@ void sigchld_handler(int sig)
  */
 void sigint_handler(int sig) 
 {
-    return;
+   	printf("\nctrl-c pressed\n");
+	exit(1);
 }
 
 /*
@@ -314,7 +315,8 @@ void sigint_handler(int sig)
  */
 void sigtstp_handler(int sig) 
 {
-    return;
+    	printf("\nctrl-z pressed\n");
+	exit(1);
 }
 
 /*********************
