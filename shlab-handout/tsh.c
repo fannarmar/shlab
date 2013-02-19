@@ -186,14 +186,19 @@ void eval(char *cmdline)
 	//Fork a child process and run the job in the context of the child
 	
 	pid_t pid;
+	int child_status;
 
 	if ((pid = fork()) == 0)
 	{
 		//Child process
 		execve(argv[0],argv,environ);
 	}
+	else
+	{
+		wait(&child_status);
+	}
 
-	printf("parent");
+	
 
 	return;
 }
