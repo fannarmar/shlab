@@ -199,10 +199,13 @@ void eval(char *cmdline)
 		{
 			//Parent process	
 	
+			//Set new process group ID to child
+			setpgid(pid,0); //Set pgid of process pid to pid
+
 			if (parseRet == 0)
 			{
 				//Run child process in foreground
-			
+	
 				//Add child to job list
 				addjob(jobs, pid, FG, cmdline);
 				//Parent waits for child to terminate
@@ -350,8 +353,12 @@ void sigchld_handler(int sig)
  */
 void sigint_handler(int sig) 
 {
-   	printf("\nctrl-c pressed\n");
-	exit(1);
+   	int pidToKill = fgpid(jobs);
+	int jidToKill = pid2jid(pidToKill);
+
+	kill(pidToKill, sig);
+	printf("Job [%d] (%d) terminated by signal %d", jidToKill, pidToKill, sig);
+	printf("\n");
 }
 
 /*
