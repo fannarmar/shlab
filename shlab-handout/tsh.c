@@ -173,14 +173,15 @@ int main(int argc, char **argv)
 */
 void eval(char *cmdline) 
 {
-	char **argv;	//Define argv array
-	int ParseRet;	//0 run in fg, 1 run in bg or no arguments given (blank line)
-	ParseRet = parseline(*cmdline, **argv);	//Fill out argv
+	char *argv[MAXARGS];	//Define argv array
+	int parseRet;	//0 run in fg, 1 run in bg or no arguments given (blank line)
+	parseRet = parseline(cmdline, argv);	//Fill out argv
 	
 	//argv has been filled out
 
 	if(builtin_cmd(argv) != 0)
 		printf("We have a builtin command!");
+
 
 
 	return;
@@ -249,7 +250,19 @@ int parseline(const char *cmdline, char **argv)
  */
 int builtin_cmd(char **argv) 
 {
-    return 0;     /* not a builtin command */
+    	if (strcmp(argv[0], "quit")==0)
+		printf("QUITTER!\n");
+	else if (strcmp(argv[0], "fg")==0)
+		printf("fgfgfg\n");
+	else if (strcmp(argv[0], "bg")==0)
+                 printf("bgbgbg\n");
+	else if (strcmp(argv[0], "jobs")==0)
+                 printf("STEVE JOBS\n");
+
+
+
+
+	return 0;     /* not a builtin command */
 }
 
 /* 
