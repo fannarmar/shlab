@@ -174,15 +174,26 @@ int main(int argc, char **argv)
 void eval(char *cmdline) 
 {
 	char *argv[MAXARGS];	//Define argv array
-	int parseRet;	//0 run in fg, 1 run in bg or no arguments given (blank line)
-	parseRet = parseline(cmdline, argv);	//Fill out argv
+	int parseRet;		//0 run in fg, 1 run in bg or no arguments given (blank line)
 	
-	//argv has been filled out
+	parseRet = parseline(cmdline, argv);	//Fill argv
+	
+	//argv has been filled
 
 	if(builtin_cmd(argv) != 0)
-		printf("We have a builtin command!");
+		printf("We have a builtin command! Already executed.\n");
 
+	//Fork a child process and run the job in the context of the child
+	
+	pid_t pid;
 
+	if ((pid = fork()) == 0)
+	{
+		//Child process
+		execve(argv[0],argv,environ);
+	}
+
+	printf("parent");
 
 	return;
 }
@@ -251,18 +262,19 @@ int parseline(const char *cmdline, char **argv)
 int builtin_cmd(char **argv) 
 {
     	if (strcmp(argv[0], "quit")==0)
-		printf("QUITTER!\n");
+	{
+		exit(0);
+	}	
 	else if (strcmp(argv[0], "fg")==0)
 		printf("fgfgfg\n");
 	else if (strcmp(argv[0], "bg")==0)
                  printf("bgbgbg\n");
 	else if (strcmp(argv[0], "jobs")==0)
                  printf("STEVE JOBS\n");
+	else
+		return 0;     /* not a builtin command */
 
-
-
-
-	return 0;     /* not a builtin command */
+	return 1;
 }
 
 /* 
