@@ -174,8 +174,13 @@ int main(int argc, char **argv)
 void eval(char *cmdline) 
 {
 	char **argv;	//Define argv array
-	int bParseRet;	//0 run in fg, 1 run in bg or no arguments given (blank line)
-	bParseRet = parseline(*cmdline, **argv);	//Fill out argv
+	int ParseRet;	//0 run in fg, 1 run in bg or no arguments given (blank line)
+	ParseRet = parseline(*cmdline, **argv);	//Fill out argv
+	
+	//argv has been filled out
+
+	if(builtin_cmd(argv) != 0)
+		printf("We have a builtin command!");
 
 
 	return;
