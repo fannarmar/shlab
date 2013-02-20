@@ -211,7 +211,10 @@ void eval(char *cmdline)
 			setpgid(0,0);				//Set new process group ID
 			sigprocmask(SIG_UNBLOCK, &mask, NULL);	//Unblock SIGCHLD signals	
 			if (execve(argv[0],argv,environ) == -1)	//Run job
+			{
 				printf("%s: Command not found\n", argv[0]);
+				exit(0); // Terminate child
+			}
 		}		
 		else
 		{
@@ -343,28 +346,39 @@ void do_bgfg(char **argv)
 	if (*argv[1] == '%')	//Dereference first characer in argv[1]
 	{	
 		//User specified jid
-	
-		if ((my_id = atoi(argv[1]+1)) == 0)	//Second character in argv[1]
+		char *c_my_id = argv[1]+1;
+		if (!isdigit(*c_my_id))	//Second character in argv[1]
 		{
-			printf("%s: argument must be a PID or %%jobid", argv[0]);
+			printf("%s: argument must be a PID or %%jobid\n", argv[0]);
 			return;
 		}
-		my_job = getjobjid(jobs, my_id);
+		
+		my_id = atoi(c_my_id);
+		if ((my_job = getjobjid(jobs, my_id)) == NULL)
+		{
+			printf("%s: No such job\n", argv[1]);
+			return;
+		}
 	}
-	else
+	else if (isdigit(*argv[1]))
 	{
 		//User specified pid
 		my_id = atoi(argv[1]);
-		my_job = getjobpid(jobs, my_id);
+		if((my_job = getjobpid(jobs, my_id)) == NULL)
+		{
+			printf("(%s): No such process\n", argv[1]);
+			return;
+		}
+		
 	}
-
-
-	//struct job_t *my_job = getjobjid(jobs, my_jid);
+	else
+	{
+		printf("%s: argument must be a PID or %%jobid\n", argv[0]);
+		return;
+	}	
 
 	int my_pid = my_job->pid;
 	int my_jid = my_job->jid;
-	
-	//ÞARF AÐ HENDA INN ERROR HANDLING HÉRNA UM HVORT MYJOB SÉ NULL
      
 
 	if (strcmp(argv[0], "bg") == 0)
@@ -414,19 +428,15 @@ void sigchld_handler(int sig)
 {
     	//Throw out finished processes
 	//Change status to ST for stopped processes
-	
-	//TODO: error handling for deletejob
 
 	int child_status;
 	
-	//Sjá bls. 724 og 725 í bók
 	pid_t culprit_pid; //pid of terminated or stopped child, 0 if no child terminated/stopped, -1 err
 	pid_t culprit_jid;
 
 	
 	while((culprit_pid = waitpid(-1, &child_status, WNOHANG | WUNTRACED)) > 0)
 	{
-
 		culprit_jid = pid2jid(culprit_pid);
 	 	
 		if (WIFEXITED(child_status))
