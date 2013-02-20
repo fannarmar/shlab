@@ -209,7 +209,7 @@ void eval(char *cmdline)
 				//Add child to job list
 				addjob(jobs, pid, FG, cmdline);
 				//Parent waits for child to terminate
-				waitpid(pid, &child_status, 0);
+				waitfg(pid);
 			}
 
 			else if (parseRet == 1)
@@ -324,7 +324,15 @@ void do_bgfg(char **argv)
  */
 void waitfg(pid_t pid)
 {
-    return;
+    	//Use a busy loop around the sleep() function
+    	
+	while (fgpid(jobs) == pid)
+	{
+		listjobs(jobs);
+		sleep(1);
+	}
+	
+	return;
 }
 
 /*****************
@@ -351,12 +359,27 @@ void sigchld_handler(int sig)
 	int child_status;
 	
 	//Sjá bls. 724 og 725 í bók
-	int culprit_pid; //0 if no child in wait set terminated, or pid of terminated child 
+	int culprit_pid; //pid of terminated or stopped child, 0 if no child terminated/stopped, -1 err 
 	
 
-	culprit_pid = waitpid(-1, &child_status, WNOHANG);
+	culprit_pid = waitpid(-1, &child_status, WNOHANG|WUNTRACED);
 	
-
+	//printf("soomething happened¨!!!!!!!!!!! %d \n", culprit_pid);
+	
+	if (culprit_pid > 0)
+	{
+		if (WIFEXITED(child_status) == 1)
+		{
+			printf("child %d exited normally\n", culprit_pid);
+			deletejob(jobs, culprit_pid);
+		}
+	
+		if (WIFSTOPPED(child_status) == 1)
+		{
+			printf("child %d stopped normally\n", culprit_pid);
+			//Breyta færslu í job lista í stopped hérna
+		}
+	}
 }
 
 /* 
@@ -384,11 +407,10 @@ void sigtstp_handler(int sig)
     	int pidToKill = fgpid(jobs);
 	int jidToKill = pid2jid(pidToKill);
 
-	//Þarf að setja job status í stopped hérna
-
 	kill(-pidToKill, sig);
 	printf("Job [%d] (%d) stopped by signal %d", jidToKill, pidToKill, sig);
 	printf("\n");
+	
 }
 
 /*********************
