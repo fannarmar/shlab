@@ -176,6 +176,8 @@ void eval(char *cmdline)
 	char *argv[MAXARGS];	//Define argv array
 	int parseRet;		//0 run in fg, 1 run in bg or no arguments given (blank line)
 	
+	sigset_t mask;		//signal mask
+
 	parseRet = parseline(cmdline, argv);	//Fill argv
 	
 	//argv has been filled
@@ -185,12 +187,31 @@ void eval(char *cmdline)
 
 		//Fork a child process and run the job in the context of the child
 	
+		//Block SIGCHLD signals to avoid race conditions
+
+		if (sigemptyset(&mask) < 0)
+		{
+			//Error handling
+		}
+		if (sigaddset(&mask, SIGCHLD))
+		{
+			//Error handling
+		}			
+		if (sigprocmask(SIG_BLOCK, &mask, NULL) < 0)
+		{
+			//Error handling
+		}
+		
+		//Fork child process	
+	
 		pid_t pid;
 
 		if ((pid = fork()) == 0)	//fork returns 0 to child and child's pid to parent
 		{
 			//Child process
-			
+		
+			//Unblock SIGCHLD signals
+			sigprocmask(SIG_UNBLOCK, &mask, NULL);	
 			//Run job
 			execve(argv[0],argv,environ);
 		}
@@ -207,6 +228,8 @@ void eval(char *cmdline)
 	
 				//Add child to job list
 				addjob(jobs, pid, FG, cmdline);
+				//Unblock SIGCHLD signals
+				sigprocmask(SIG_UNBLOCK, &mask, NULL);
 				//Parent waits for child to terminate
 				waitfg(pid);
 			}
@@ -217,6 +240,8 @@ void eval(char *cmdline)
 			
 				//Add child to job list
 				addjob(jobs, pid, BG, cmdline);
+				//Unblock SIGCHLD signals
+				sigprocmask(SIG_UNBLOCK, &mask, NULL);
 				//Print bg process info line
 				printf("[%d] (%d) %s", pid2jid(pid), pid, cmdline); 
 	
@@ -399,7 +424,7 @@ void sigchld_handler(int sig)
 	if (culprit_pid > 0)
 	{
 		if (WIFEXITED(child_status) == 1)
-		{
+{
 			if (verbose)
 				printf("child %d exited normally\n", culprit_pid);
 			deletejob(jobs, culprit_pid);
