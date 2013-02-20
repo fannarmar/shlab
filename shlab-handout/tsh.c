@@ -217,7 +217,7 @@ void eval(char *cmdline)
 			
 				//Add child to job list
 				addjob(jobs, pid, BG, cmdline);
-				//Print info line
+				//Print bg process info line
 				printf("[%d] (%d) %s", pid2jid(pid), pid, cmdline); 
 	
 
@@ -298,9 +298,9 @@ int builtin_cmd(char **argv)
 		exit(0);
 	}	
 	else if (strcmp(argv[0], "fg")==0)
-		printf("fgfgfg\n");
+		do_bgfg(argv);
 	else if (strcmp(argv[0], "bg")==0)
-                 printf("bgbgbg\n");
+                do_bgfg(argv);
 	else if (strcmp(argv[0], "jobs")==0)
                  listjobs(jobs);
 	else
@@ -314,8 +314,41 @@ int builtin_cmd(char **argv)
  */
 void do_bgfg(char **argv) 
 {
-	//Þetta er bara til að taka núþegar keyrandi processa og setja í bg eða fg
-    return;
+	//Put an already running process to background or foreground
+    	
+	//User commands are of the form bg/fg %jid/%pid
+	//
+	//TODO: handle if user uses PIDs instead of JIDs
+    	
+	int my_jid = 0;	
+
+	if (*argv[1] == '%')	//Dereference first characer in argv[1]
+	{	
+		my_jid = atoi(argv[1]+1);	//Second character in argv[1]
+	}
+
+
+	struct job_t *my_job = getjobjid(jobs, my_jid);
+
+	int my_pid = my_job->pid;
+
+	//ÞARF AÐ HENDA INN ERROR HANDLING HÉRNA UM HVORT MYJOB SÉ NULL
+     
+
+	if (strcmp(argv[0], "bg") == 0)
+	{
+		kill(-my_pid, SIGCONT);
+		my_job->state = BG;
+		printf("[%d] (%d) %s", my_jid, my_pid, my_job->cmdline); //Print bg process info line	
+	}
+	else if (strcmp(argv[0], "fg") == 0)
+	{
+		kill(-my_pid, SIGCONT);
+		my_job->state = FG;
+	} 
+	
+
+	return;
 }
 
 /* 
@@ -362,7 +395,6 @@ void sigchld_handler(int sig)
 
 	culprit_pid = waitpid(-1, &child_status, WNOHANG|WUNTRACED);
 	
-	//printf("soomething happened¨!!!!!!!!!!! %d \n", culprit_pid);
 	
 	if (culprit_pid > 0)
 	{
@@ -393,6 +425,8 @@ void sigint_handler(int sig)
 {
    	int pidToKill = fgpid(jobs);
 	int jidToKill = pid2jid(pidToKill);
+
+	printf("siginthandler RUNNING\n");
 
 	kill(-pidToKill, sig);
 	printf("Job [%d] (%d) terminated by signal %d", jidToKill, pidToKill, sig);
