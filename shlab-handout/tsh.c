@@ -210,8 +210,9 @@ void eval(char *cmdline)
 			
 			setpgid(0,0);				//Set new process group ID
 			sigprocmask(SIG_UNBLOCK, &mask, NULL);	//Unblock SIGCHLD signals	
-			execve(argv[0],argv,environ);		//Run job
-		}
+			if (execve(argv[0],argv,environ) == -1)	//Run job
+				printf("%s: Command not found\n", argv[0]);
+		}		
 		else
 		{
 			//Parent process	
@@ -328,23 +329,41 @@ void do_bgfg(char **argv)
 {
 	//Put an already running process to background or foreground
     	
-	//User commands are of the form bg/fg %jid/%pid
-	//
-	//TODO: handle if user uses PIDs instead of JIDs
+	//User commands are of the form bg/fg %jid/pid
     	
-	
-	int my_jid = 0;	
+	int my_id = 0;
+	struct job_t *my_job;
 
+	if (argv[1] == NULL)
+	{
+		printf("%s command requires PID or %%jobid argument\n", argv[0]);
+		return;
+	}	
+	
 	if (*argv[1] == '%')	//Dereference first characer in argv[1]
 	{	
-		my_jid = atoi(argv[1]+1);	//Second character in argv[1]
+		//User specified jid
+	
+		if ((my_id = atoi(argv[1]+1)) == 0)	//Second character in argv[1]
+		{
+			printf("%s: argument must be a PID or %%jobid", argv[0]);
+			return;
+		}
+		my_job = getjobjid(jobs, my_id);
+	}
+	else
+	{
+		//User specified pid
+		my_id = atoi(argv[1]);
+		my_job = getjobpid(jobs, my_id);
 	}
 
 
-	struct job_t *my_job = getjobjid(jobs, my_jid);
+	//struct job_t *my_job = getjobjid(jobs, my_jid);
 
 	int my_pid = my_job->pid;
-
+	int my_jid = my_job->jid;
+	
 	//ÞARF AÐ HENDA INN ERROR HANDLING HÉRNA UM HVORT MYJOB SÉ NULL
      
 
