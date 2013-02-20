@@ -175,14 +175,10 @@ void eval(char *cmdline)
 {
 	char *argv[MAXARGS];	//Define argv array
 	int parseRet;		//0 run in fg, 1 run in bg or no arguments given (blank line)
-	
-	sigset_t mask;		//signal mask
-
-	pid_t pid;
+	sigset_t mask;		//Signal mask
+	pid_t pid;		//Process ID
 
 	parseRet = parseline(cmdline, argv);	//Fill argv
-	
-	//argv has been filled
 
 	if (!(builtin_cmd(argv)))
 	{
@@ -190,7 +186,6 @@ void eval(char *cmdline)
 		//Fork a child process and run the job in the context of the child
 	
 		//Block SIGCHLD signals to avoid race conditions
-
 		if (sigemptyset(&mask) < 0)
 		{
 			//Error handling
@@ -209,45 +204,34 @@ void eval(char *cmdline)
 		
 		//Fork child process	
 
-		if ((pid = fork()) == 0)	//fork returns 0 to child and child's pid to parent
+		if ((pid = fork()) == 0)	//fork() returns 0 to child and child's pid to parent
 		{
-			//Child process
-		
-			//Unblock SIGCHLD signals
-			sigprocmask(SIG_UNBLOCK, &mask, NULL);	
-			//Run job
-			execve(argv[0],argv,environ);
+			//Child process	
+			
+			setpgid(0,0);				//Set new process group ID
+			sigprocmask(SIG_UNBLOCK, &mask, NULL);	//Unblock SIGCHLD signals	
+			execve(argv[0],argv,environ);		//Run job
 		}
 		else
 		{
 			//Parent process	
-	
-			//Set new process group ID to child
-			setpgid(0,0);
 
 			if (parseRet == 0)
 			{
 				//Run child process in foreground
 	
-				//Add child to job list
-				addjob(jobs, pid, FG, cmdline);
-				//Unblock SIGCHLD signals
-				sigprocmask(SIG_UNBLOCK, &mask, NULL);
-				//Parent waits for child to terminate
-				waitfg(pid);
+				addjob(jobs, pid, FG, cmdline);		//Add child to job list
+				sigprocmask(SIG_UNBLOCK, &mask, NULL);	//Unblock SIGCHLD signals
+				waitfg(pid);				//Parent waits while child in fg
 			}
 
 			else if (parseRet == 1)
 			{
 				//Run child process in background
 			
-				//Add child to job list
-				addjob(jobs, pid, BG, cmdline);
-				//Unblock SIGCHLD signals
-				sigprocmask(SIG_UNBLOCK, &mask, NULL);
-				//Print bg process info line
-				printf("[%d] (%d) %s", pid2jid(pid), pid, cmdline); 
-	
+				addjob(jobs, pid, BG, cmdline);		//Add child to job list
+				sigprocmask(SIG_UNBLOCK, &mask, NULL);	//Unblock SIGCHLD signals
+				printf("[%d] (%d) %s", pid2jid(pid), pid, cmdline); //BG process info
 
 			}
 		}
@@ -389,7 +373,6 @@ void waitfg(pid_t pid)
     	
 	while (fgpid(jobs) == pid)
 	{
-		//printf("WAIT\n");
 		sleep(0.01);
 	}
 	
@@ -409,53 +392,46 @@ void waitfg(pid_t pid)
  */
 void sigchld_handler(int sig) 
 {
-    	//Gerist þegar background process klárast, þurfum að henda þeim úr job listanum
-
-	//Viljum henda forground jobbi hér úr jobs lista, það hefur fengið sigstop
-
-	//Þarf að henda kláruðum jobbum úr job lista hérna
-
-	//waitpid með pid = -1 og WNOHANG og WUNTRACED, tékka svo á ástæðu return með macro
+    	//Throw out finished processes
+	//Change status to ST for stopped processes
 	
+	//TODO: error handling for deletejob
+
 	int child_status;
 	
 	//Sjá bls. 724 og 725 í bók
-	int culprit_pid; //pid of terminated or stopped child, 0 if no child terminated/stopped, -1 err 
-	int culprit_jid;
+	pid_t culprit_pid; //pid of terminated or stopped child, 0 if no child terminated/stopped, -1 err
+	pid_t culprit_jid;
 
 	
-	while((culprit_pid = waitpid(-1, &child_status, WNOHANG|WUNTRACED)) > 0)
+	while((culprit_pid = waitpid(-1, &child_status, WNOHANG | WUNTRACED)) > 0)
 	{
 
 		culprit_jid = pid2jid(culprit_pid);
 	 	
-		if (WIFEXITED(child_status) == 1)
+		if (WIFEXITED(child_status))
 		{
 			//Child terminated normally, via a call to exit or a return
-			
-			if (verbose)
+			if (verbose)	
 				printf("child %d exited normally\n", culprit_pid);
 
 			deletejob(jobs, culprit_pid);	
 		}
 
-	/*	if (WIFSIGNALED(child_status) == 1)
+		else if (WIFSIGNALED(child_status))
 		{
 			//Child terminated because of a signal that was not caught
 			
-			//if (verbose)
+			if (verbose)
 				printf("child %d exited because of a signal\n", culprit_pid);
 
 			deletejob(jobs, culprit_pid);
 			
 			printf("Job [%d] (%d) terminated by signal %d", culprit_jid, culprit_pid, WTERMSIG(child_status));
 			printf("\n");
-			
-		}*/
-
-
+		}
 	
-		if (WIFSTOPPED(child_status) == 1)
+		else if (WIFSTOPPED(child_status))
 		{
 			//Child that caused the return is stopped
 
@@ -469,7 +445,8 @@ void sigchld_handler(int sig)
 			printf("Job [%d] (%d) stopped by signal %d", culprit_jid, culprit_pid, WSTOPSIG(child_status));
 			printf("\n");
 		}
-	
+		
+		
 	}
 }
 
@@ -480,10 +457,8 @@ void sigchld_handler(int sig)
  */
 void sigint_handler(int sig) 
 {
-	int pidToKill = fgpid(jobs);
-	kill(-pidToKill, sig);
-	printf("Job [%d] (%d) terminated by signal %d", pid2jid(pidToKill), pidToKill, sig);
-	printf("\n");	
+	pid_t pidToKill = fgpid(jobs);
+	kill(-pidToKill, sig);	
 }
 
 /*
@@ -493,7 +468,7 @@ void sigint_handler(int sig)
  */
 void sigtstp_handler(int sig) 
 {
-    	int pidToKill = fgpid(jobs);
+    	pid_t pidToKill = fgpid(jobs);
 	kill(-pidToKill, sig);	
 }
 
