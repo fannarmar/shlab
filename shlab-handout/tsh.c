@@ -358,6 +358,7 @@ void do_bgfg(char **argv)
 	{
 		kill(-my_pid, SIGCONT);
 		my_job->state = FG;
+		waitfg(my_pid);	//Wait for foreground process
 	} 
 	
 
