@@ -178,6 +178,8 @@ void eval(char *cmdline)
 	
 	sigset_t mask;		//signal mask
 
+	pid_t pid;
+
 	parseRet = parseline(cmdline, argv);	//Fill argv
 	
 	//argv has been filled
@@ -192,19 +194,20 @@ void eval(char *cmdline)
 		if (sigemptyset(&mask) < 0)
 		{
 			//Error handling
+			printf("sigemptyset error");
 		}
 		if (sigaddset(&mask, SIGCHLD))
 		{
 			//Error handling
+			printf("sigaddset error");
 		}			
 		if (sigprocmask(SIG_BLOCK, &mask, NULL) < 0)
 		{
 			//Error handling
+			printf("sigprocmask error");
 		}
 		
 		//Fork child process	
-	
-		pid_t pid;
 
 		if ((pid = fork()) == 0)	//fork returns 0 to child and child's pid to parent
 		{
@@ -220,7 +223,7 @@ void eval(char *cmdline)
 			//Parent process	
 	
 			//Set new process group ID to child
-			setpgid(pid,0); //Set pgid of process pid to pid
+			setpgid(0,0);
 
 			if (parseRet == 0)
 			{
@@ -345,6 +348,7 @@ void do_bgfg(char **argv)
 	//
 	//TODO: handle if user uses PIDs instead of JIDs
     	
+	
 	int my_jid = 0;	
 
 	if (*argv[1] == '%')	//Dereference first characer in argv[1]
@@ -385,7 +389,8 @@ void waitfg(pid_t pid)
     	
 	while (fgpid(jobs) == pid)
 	{
-		sleep(1);
+		//printf("WAIT\n");
+		sleep(0.01);
 	}
 	
 	return;
@@ -416,28 +421,55 @@ void sigchld_handler(int sig)
 	
 	//Sjá bls. 724 og 725 í bók
 	int culprit_pid; //pid of terminated or stopped child, 0 if no child terminated/stopped, -1 err 
-	
+	int culprit_jid;
 
-	culprit_pid = waitpid(-1, &child_status, WNOHANG|WUNTRACED);
 	
-	
-	if (culprit_pid > 0)
+	while((culprit_pid = waitpid(-1, &child_status, WNOHANG|WUNTRACED)) > 0)
 	{
+
+		culprit_jid = pid2jid(culprit_pid);
+	 	
 		if (WIFEXITED(child_status) == 1)
-{
+		{
+			//Child terminated normally, via a call to exit or a return
+			
 			if (verbose)
 				printf("child %d exited normally\n", culprit_pid);
-			deletejob(jobs, culprit_pid);
+
+			deletejob(jobs, culprit_pid);	
 		}
+
+	/*	if (WIFSIGNALED(child_status) == 1)
+		{
+			//Child terminated because of a signal that was not caught
+			
+			//if (verbose)
+				printf("child %d exited because of a signal\n", culprit_pid);
+
+			deletejob(jobs, culprit_pid);
+			
+			printf("Job [%d] (%d) terminated by signal %d", culprit_jid, culprit_pid, WTERMSIG(child_status));
+			printf("\n");
+			
+		}*/
+
+
 	
 		if (WIFSTOPPED(child_status) == 1)
 		{
+			//Child that caused the return is stopped
+
 			if (verbose)
-				printf("child %d stopped normally\n", culprit_pid);
-			//Breyta færslu í job lista í stopped hérna
+				printf("child %d stopped\n", culprit_pid);
+			
+			//Change job list state to stopped
 			struct job_t *myJob = getjobpid(jobs, culprit_pid);
 			myJob->state = ST;
+			
+			printf("Job [%d] (%d) stopped by signal %d", culprit_jid, culprit_pid, WSTOPSIG(child_status));
+			printf("\n");
 		}
+	
 	}
 }
 
@@ -448,14 +480,10 @@ void sigchld_handler(int sig)
  */
 void sigint_handler(int sig) 
 {
-   	int pidToKill = fgpid(jobs);
-	int jidToKill = pid2jid(pidToKill);
-
-	printf("siginthandler RUNNING\n");
-
+	int pidToKill = fgpid(jobs);
 	kill(-pidToKill, sig);
-	printf("Job [%d] (%d) terminated by signal %d", jidToKill, pidToKill, sig);
-	printf("\n");
+	printf("Job [%d] (%d) terminated by signal %d", pid2jid(pidToKill), pidToKill, sig);
+	printf("\n");	
 }
 
 /*
@@ -466,12 +494,7 @@ void sigint_handler(int sig)
 void sigtstp_handler(int sig) 
 {
     	int pidToKill = fgpid(jobs);
-	int jidToKill = pid2jid(pidToKill);
-
-	kill(-pidToKill, sig);
-	printf("Job [%d] (%d) stopped by signal %d", jidToKill, pidToKill, sig);
-	printf("\n");
-	
+	kill(-pidToKill, sig);	
 }
 
 /*********************
