@@ -186,7 +186,6 @@ void eval(char *cmdline)
 		//Fork a child process and run the job in the context of the child
 	
 		pid_t pid;
-		int child_status;
 
 		if ((pid = fork()) == 0)	//fork returns 0 to child and child's pid to parent
 		{
@@ -328,7 +327,6 @@ void waitfg(pid_t pid)
     	
 	while (fgpid(jobs) == pid)
 	{
-		listjobs(jobs);
 		sleep(1);
 	}
 	
@@ -370,14 +368,18 @@ void sigchld_handler(int sig)
 	{
 		if (WIFEXITED(child_status) == 1)
 		{
-			printf("child %d exited normally\n", culprit_pid);
+			if (verbose)
+				printf("child %d exited normally\n", culprit_pid);
 			deletejob(jobs, culprit_pid);
 		}
 	
 		if (WIFSTOPPED(child_status) == 1)
 		{
-			printf("child %d stopped normally\n", culprit_pid);
+			if (verbose)
+				printf("child %d stopped normally\n", culprit_pid);
 			//Breyta færslu í job lista í stopped hérna
+			struct job_t *myJob = getjobpid(jobs, culprit_pid);
+			myJob->state = ST;
 		}
 	}
 }
